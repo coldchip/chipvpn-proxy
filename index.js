@@ -11,9 +11,12 @@ app.get('/', (req, res) => {
 
 	var filtered = [];
 	for(const session of sessions) {
-		var s = session;
-		s.ip = "[REDACTED]";
-		filtered.push(s);
+		filtered.push({
+			ip: "[REDACTED]",
+			port: session.port,
+			tx: session.tx,
+			rx: session.rx
+		});
 	}
 
 	res.send(filtered);
