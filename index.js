@@ -34,7 +34,7 @@ var server = net.createServer((client) => {
 	});
 
 	var remote = new net.Socket();
-	remote.connect(443, 'vpn.coldchip.ru');
+	remote.connect(5554, '127.0.0.1');
 
 	client.on('data', (data) => {
 		for(const session of sessions) {
