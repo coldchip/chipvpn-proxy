@@ -83,7 +83,7 @@ var server = net.createServer((client) => {
 
 	client.on('close', function () {
 		console.log('Client disconnect.');
-		sessions = sessions.filter(session => session.ip !== client.remoteAddress && session.port !== client.remotePort)
+		sessions = sessions.filter(session => session.ip !== client.remoteAddress || session.port !== client.remotePort)
 		remote.end();
 	});
 	remote.on('close', function () {
