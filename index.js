@@ -1,106 +1,65 @@
 const express = require('express');
 const net = require('net');
+const fs = require('fs');
 
 var sessions = [];
 
 const app = express();
-const port = 80;
+const port = 8080;
 
 app.get('/', (req, res) => {
 	res.set("Content-Type", "application/json");
 
-	var filtered = [];
-	for(const session of sessions) {
-		filtered.push({
-			ip: "[REDACTED]",
-			port: session.port,
-			tx: session.tx,
-			rx: session.rx
-		});
-	}
-
-	res.send(filtered);
+	res.send(`Session Count: ${sessions.length}`);
 });
 
 app.listen(port, () => {
 	console.log(`Example app listening on port ${port}`)
-})
+});
 
-var server = net.createServer((client) => {
-	console.log("Client connect", client.remoteAddress, client.remotePort);
+try {
+	fs.unlinkSync('./chipvpn-auth.sock');
+} catch(e) {
 
-	sessions.push({
-		ip: client.remoteAddress,
-		port: client.remotePort,
-		tx: 0,
-		rx: 0
-	});
+}
 
-	var remote = new net.Socket();
-	remote.connect(5554, '127.0.0.1');
+// This server listens on a Unix socket at /var/run/mysocket
+var unixServer = net.createServer((client) => {
+    // Do something with the client connection
+    console.log("ipc connects");
 
 	client.on('data', (data) => {
-		for(const session of sessions) {
-			if(session.ip === client.remoteAddress && session.port === client.remotePort) {
-				console.log("client -> remote", data);
+		var json = JSON.parse(data.toString());
+		console.log(json);
 
-				session.tx += data.length;
-
-				var w = remote.write(data);
-				if(!w) {
-					client.pause();
+		switch(json.type) {
+			case "sync": {
+				sessions = json.peers;
+			}
+			break;
+			case "login": {
+				if(json.token === process.argv.slice(2)[0]) {
+					client.write(JSON.stringify({
+						type: "login",
+						success: true,
+						peerid: json.peerid
+					}));
 				}
 			}
-		}
-	});
-	remote.on('data', (data) => {
-		for(const session of sessions) {
-			if(session.ip === client.remoteAddress && session.port === client.remotePort) {
-				console.log("remote -> client", data);
-				session.rx += data.length;
-				
-				var w = client.write(data);
-				if(!w) {
-					remote.pause();
-				}
+			break;
+			default: {
+				console.log("Unknown type");
 			}
+			break;
 		}
 	});
-
-	client.on('drain', (data) => {
-		remote.resume();
-	});
-	remote.on('drain', (data) => {
-		client.resume();
-	});
-
 	client.on('error', function() {
-		remote.end();
-	});
-	remote.on('error', function() {
 		client.end();
 	});
-
 	client.on('close', function () {
-		console.log('Client disconnect.');
-		sessions = sessions.filter(session => session.ip !== client.remoteAddress || session.port !== client.remotePort)
-		remote.end();
-	});
-	remote.on('close', function () {
-		console.log('Client disconnect.');
+		console.log('ipc disconnects.');
 		client.end();
 	});
 });
 
-server.listen(443, function () {
-	// Get server address info.
-	var serverInfo = server.address();
-	var serverInfoJson = JSON.stringify(serverInfo);
-	console.log('TCP server listen on address : ' + serverInfoJson);
-	server.on('close', function () {
-	    console.log('TCP server socket is closed.');
-	});
-	server.on('error', function (error) {
-	    console.error(JSON.stringify(error));
-	});
-});
+unixServer.listen('./chipvpn-auth.sock');
