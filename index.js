@@ -29,6 +29,7 @@ var unixServer = net.createServer((client) => {
     console.log("ipc connects");
 
 	client.on('data', (data) => {
+		console.log("recv", data.toString());
 		var json = JSON.parse(data.toString());
 		console.log(json);
 
