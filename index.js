@@ -5,7 +5,7 @@ const fs = require('fs');
 var sessions = [];
 
 const app = express();
-const port = 8080;
+const port = 80;
 
 app.get('/', (req, res) => {
 	res.set("Content-Type", "application/json");
