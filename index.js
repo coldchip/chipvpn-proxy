@@ -5,7 +5,7 @@ const fs = require('fs');
 var sessions = [];
 
 const app = express();
-const port = 80;
+const port = 8080;
 
 app.get('/', (req, res) => {
 	res.set("Content-Type", "application/json");
@@ -23,35 +23,54 @@ try {
 
 }
 
+var buffer = [];
+
 // This server listens on a Unix socket at /var/run/mysocket
 var unixServer = net.createServer((client) => {
     // Do something with the client connection
     console.log("ipc connects");
 
 	client.on('data', (data) => {
-		console.log("recv", data.toString());
-		var json = JSON.parse(data.toString());
-		console.log(json);
+		for(const bit of data) {
+			buffer.push(bit);
+			if(buffer.length > 16384) {
+				buffer = [];
+			}
+		}
 
-		switch(json.type) {
-			case "sync": {
-				sessions = json.peers;
-			}
-			break;
-			case "login": {
-				if(json.token === process.argv.slice(2)[0]) {
-					client.write(JSON.stringify({
-						type: "login",
-						success: true,
-						peerid: json.peerid
-					}));
+		if(buffer.includes(0)) {
+			var message = "";
+			while(true) {
+				var bit = buffer.shift();
+				if(bit === 0) {
+					break;
 				}
+				message = message.concat(String.fromCharCode(bit));
 			}
-			break;
-			default: {
-				console.log("Unknown type");
+			console.log(message, buffer);
+			var json = JSON.parse(message.toString());
+			console.log(json);
+
+			switch(json.type) {
+				case "sync": {
+					sessions = json.peers;
+				}
+				break;
+				case "login": {
+					if(json.token === process.argv.slice(2)[0]) {
+						client.write(JSON.stringify({
+							type: "login",
+							success: true,
+							peerid: json.peerid
+						}));
+					}
+				}
+				break;
+				default: {
+					console.log("Unknown type");
+				}
+				break;
 			}
-			break;
 		}
 	});
 	client.on('error', function() {
